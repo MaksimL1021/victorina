@@ -270,7 +270,18 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
   const COLORS = {1:'#C1272D', 2:'#1F6F54', 3:'#2B4C8C'};
-  let myTeam = null;
+
+  // Stable per-phone id so the server can recognise us across reconnects.
+  let clientId = localStorage.getItem('cbz_cid');
+  if(!clientId){
+    clientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('cbz_cid', clientId);
+  }
+
+  // Restore an in-progress team so a reload / reconnect rejoins automatically.
+  let myTeam = Number(localStorage.getItem('cbz_team')) || null;
+  let myName = localStorage.getItem('cbz_name') || '';
+  let manualJoin = false; // true only for an explicit button tap (controls error alert)
   let lastQIndex = -1;
 
   const screens = {
@@ -291,6 +302,11 @@
   socket.on('connect', () => {
     connStatus.textContent = 'на связи';
     connStatus.classList.remove('offline');
+    // Auto-rejoin our team after a reconnect so we keep getting question updates.
+    if(myTeam){
+      manualJoin = false;
+      socket.emit('team:join', { team: myTeam, name: myName, clientId });
+    }
   });
   socket.on('disconnect', () => {
     connStatus.textContent = 'нет связи...';
@@ -300,18 +316,42 @@
   document.querySelectorAll('.pick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const team = Number(btn.dataset.team);
-      const name = document.getElementById('nameInput').value.trim();
-      socket.emit('team:join', { team, name });
+      myName = document.getElementById('nameInput').value.trim();
+      manualJoin = true;
+      socket.emit('team:join', { team, name: myName, clientId });
     });
   });
 
   socket.on('team:joinError', ({ message }) => {
-    alert(message);
+    if(manualJoin){
+      alert(message);
+    } else {
+      // Auto-rejoin failed (slot taken by someone else / game reset) — back to setup.
+      clearMyTeam();
+      showScreen('setup');
+    }
   });
 
   socket.on('team:joined', ({ team }) => {
     myTeam = team;
+    localStorage.setItem('cbz_team', String(team));
+    localStorage.setItem('cbz_name', myName);
   });
+
+  // Host pressed "Сбросить игру": forget our team and return to the pick screen.
+  socket.on('team:reset', () => {
+    clearMyTeam();
+    lastQIndex = -1;
+    document.getElementById('nameInput').value = '';
+    showScreen('setup');
+  });
+
+  function clearMyTeam(){
+    myTeam = null;
+    myName = '';
+    localStorage.removeItem('cbz_team');
+    localStorage.removeItem('cbz_name');
+  }
 
   socket.on('state', (s) => {
     if(!myTeam) return; // still on setup screen

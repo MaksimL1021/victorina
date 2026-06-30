@@ -13,16 +13,21 @@ app.use(express.static(path.join(__dirname, 'public')));
 const QUESTIONS = JSON.parse(fs.readFileSync(path.join(__dirname, 'questions.json'), 'utf8'));
 
 // ---- Game state lives on the server ----
-let state = {
-  phase: 'lobby', // lobby | question | finished
-  qIndex: -1,
-  scores: { 1: 0, 2: 0, 3: 0 },
-  teamNames: { 1: 'Команда 1', 2: 'Команда 2', 3: 'Команда 3' },
-  connected: { 1: false, 2: false, 3: false },
-  buzzedTeam: null,   // which team is currently locked in to answer out loud
-  buzzedName: null,
-  excluded: []        // teams who already answered wrong on this question
-};
+function freshState() {
+  return {
+    phase: 'lobby', // lobby | question | finished
+    qIndex: -1,
+    scores: { 1: 0, 2: 0, 3: 0 },
+    teamNames: { 1: 'Команда 1', 2: 'Команда 2', 3: 'Команда 3' },
+    connected: { 1: false, 2: false, 3: false },
+    owners: { 1: null, 2: null, 3: null }, // clientId currently holding each team slot
+    buzzedTeam: null,   // which team is currently locked in to answer out loud
+    buzzedName: null,
+    excluded: []        // teams who already answered wrong on this question
+  };
+}
+
+let state = freshState();
 
 function currentQuestion() {
   return state.qIndex >= 0 && state.qIndex < QUESTIONS.length ? QUESTIONS[state.qIndex] : null;
@@ -79,21 +84,34 @@ io.on('connection', (socket) => {
     socket.emit('hostState', hostState());
   });
 
-  socket.on('team:join', ({ team, name }) => {
+  socket.on('team:join', ({ team, name, clientId }) => {
     if (![1, 2, 3].includes(Number(team))) return;
     team = Number(team);
+    const cid = clientId || ('anon-' + socket.id);
 
-    if (state.connected[team]) {
+    // Is another *live* phone (different clientId) already holding this team?
+    const otherLive = [...io.sockets.sockets.values()]
+      .find(s => s.id !== socket.id && s.data.role === 'team' && s.data.team === team);
+    if (otherLive && otherLive.data.clientId !== cid) {
       socket.emit('team:joinError', { message: 'Эта команда уже занята другим телефоном.' });
       return;
+    }
+    // Same phone reconnecting: detach the lingering old socket so it doesn't double-count.
+    if (otherLive && otherLive.data.clientId === cid) {
+      otherLive.leave('teams');
+      otherLive.data.role = null;
+      otherLive.data.team = null;
     }
 
     socket.data.role = 'team';
     socket.data.team = team;
+    socket.data.clientId = cid;
     socket.join('teams');
     state.connected[team] = true;
+    state.owners[team] = cid;
     if (name && name.trim()) state.teamNames[team] = name.trim().slice(0, 30);
     socket.emit('team:joined', { team });
+    socket.emit('state', publicState()); // (re)joined phone gets current state immediately
     broadcast();
   });
 
@@ -104,6 +122,7 @@ io.on('connection', (socket) => {
         .some(s => s.id !== socket.id && s.data.team === team);
       if (!stillThere) {
         state.connected[team] = false;
+        state.owners[team] = null;
         broadcast();
       }
     }
@@ -163,16 +182,18 @@ io.on('connection', (socket) => {
   });
 
   socket.on('host:resetGame', () => {
-    state = {
-      phase: 'lobby',
-      qIndex: -1,
-      scores: { 1: 0, 2: 0, 3: 0 },
-      teamNames: state.teamNames,
-      connected: state.connected,
-      buzzedTeam: null,
-      buzzedName: null,
-      excluded: []
-    };
+    // Full reset: clear scores AND free every team slot.
+    state = freshState();
+
+    // Kick all team phones back to the setup screen and out of the room.
+    [...io.sockets.sockets.values()].forEach(s => {
+      if (s.data.role === 'team') {
+        s.leave('teams');
+        s.data.role = null;
+        s.data.team = null;
+      }
+    });
+    io.emit('team:reset');
     broadcast();
   });
 });

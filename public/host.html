@@ -205,7 +205,7 @@
   document.getElementById('startBtn').addEventListener('click', () => socket.emit('host:start'));
   document.getElementById('nextBtn').addEventListener('click', () => socket.emit('host:next'));
   document.getElementById('resetBtn').addEventListener('click', () => {
-    if(confirm('Точно сбросить всю игру и очки?')) socket.emit('host:resetGame');
+    if(confirm('Точно сбросить всю игру, очки и подключённые команды?')) socket.emit('host:resetGame');
   });
 
   function judge(correct){
