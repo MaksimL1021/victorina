@@ -1,0 +1,13 @@
+{
+  "name": "circus-buzzer",
+  "version": "1.0.0",
+  "description": "Real-time circus-themed buzzer game for parties",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

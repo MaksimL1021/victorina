@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Пульт ведущего — Цирковая викторина</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Manrope:wght@400;600;800&display=swap');
+
+  :root{
+    --gold: #E8B23B;
+    --cream: #FBF3E2;
+    --navy: #1B1F3B;
+    --green: #1F6F54;
+    --red: #C1272D;
+    --team1: #C1272D;
+    --team2: #1F6F54;
+    --team3: #2B4C8C;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Manrope', sans-serif;
+    background: var(--navy);
+    color: var(--cream);
+    min-height:100vh;
+    padding:20px;
+  }
+  h1{
+    font-family:'Bungee', cursive;
+    font-size:24px;
+    color: var(--gold);
+    margin-bottom:18px;
+  }
+  .panel{
+    background: rgba(255,255,255,.05);
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:18px;
+    max-width:760px;
+  }
+  .teams-row{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .team-card{
+    flex:1; min-width:160px;
+    padding:14px;
+    border-radius:12px;
+    background: rgba(255,255,255,.06);
+    opacity:.4;
+    border:2px solid transparent;
+  }
+  .team-card.on{ opacity:1; }
+  .team-card.t1{ border-color: var(--team1); }
+  .team-card.t2{ border-color: var(--team2); }
+  .team-card.t3{ border-color: var(--team3); }
+  .team-card .name{ font-weight:800; margin-bottom:4px; }
+  .team-card .score{ font-family:'Bungee', cursive; color: var(--gold); font-size:22px; }
+  .team-card .status{ font-size:12px; opacity:.7; margin-top:4px; }
+
+  .btn{
+    background: var(--gold);
+    color: var(--navy);
+    border:none;
+    border-radius:12px;
+    padding:14px 22px;
+    font-weight:800;
+    font-size:15px;
+    cursor:pointer;
+    margin-right:10px;
+    margin-bottom:10px;
+  }
+  .btn.secondary{ background: rgba(255,255,255,.1); color: var(--cream); }
+  .btn.danger{ background: var(--red); color: white; }
+  .btn:disabled{ opacity:.3; cursor:default; }
+
+  .question-box{
+    background: rgba(0,0,0,.2);
+    border-radius:12px;
+    padding:16px;
+    margin-top:10px;
+  }
+  .question-box .meta{ font-size:12px; color:var(--gold); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;}
+  .question-box .text{ font-size:18px; font-weight:800; margin-bottom:12px; }
+  .opt-row{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 10px; border-radius:8px;
+    background: rgba(255,255,255,.04);
+    margin-bottom:6px;
+    font-size:14px;
+  }
+  .opt-row.is-correct{ background: rgba(31,111,84,.4); border:1px solid var(--green); }
+  .opt-row .who{ margin-left:auto; font-size:12px; opacity:.8; }
+
+  .manual-award{
+    margin-top:10px;
+    display:flex; gap:8px; flex-wrap:wrap;
+  }
+  .manual-award button{
+    padding:8px 14px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:13px; color:white;
+  }
+
+  #connStatus{
+    position:fixed; top:8px; right:8px;
+    font-size:11px; padding:4px 8px; border-radius:8px;
+    background:rgba(0,0,0,.3);
+  }
+  #connStatus.offline{ background:var(--red); }
+</style>
+</head>
+<body>
+
+<div id="connStatus">соединение...</div>
+<h1>🎪 Пульт ведущего</h1>
+
+<div class="panel">
+  <div class="teams-row" id="teamsRow"></div>
+  <div id="phaseLabel" style="margin-top:6px; opacity:.7; font-size:13px;"></div>
+</div>
+
+<div class="panel">
+  <button class="btn" id="startBtn">▶️ Начать игру</button>
+  <button class="btn secondary" id="nextBtn" disabled>➡️ Следующий вопрос</button>
+  <button class="btn danger" id="resetBtn">🔄 Сбросить игру</button>
+
+  <div class="question-box" id="questionBox" style="display:none;"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const TEAM_COLOR = {1:'#C1272D', 2:'#1F6F54', 3:'#2B4C8C'};
+  const letters = ['A','B','C','D'];
+  const connStatus = document.getElementById('connStatus');
+  const socket = io();
+
+  socket.on('connect', () => {
+    connStatus.textContent = 'на связи';
+    connStatus.classList.remove('offline');
+    socket.emit('host:join');
+  });
+  socket.on('disconnect', () => {
+    connStatus.textContent = 'нет связи...';
+    connStatus.classList.add('offline');
+  });
+
+  socket.on('hostState', render);
+
+  function render(s){
+    // Teams row
+    const teamsRow = document.getElementById('teamsRow');
+    teamsRow.innerHTML = '';
+    [1,2,3].forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'team-card t' + t + (s.connected[t] ? ' on' : '');
+      div.innerHTML = `
+        <div class="name">${s.teamNames[t]}</div>
+        <div class="score">${s.scores[t]}</div>
+        <div class="status">${s.connected[t] ? 'подключена' : 'не подключена'}</div>
+      `;
+      teamsRow.appendChild(div);
+    });
+
+    const phaseNames = { lobby: 'Зал ожидания', question: 'Идёт вопрос', finished: 'Игра окончена' };
+    document.getElementById('phaseLabel').textContent =
+      `Фаза: ${phaseNames[s.phase] || s.phase}` + (s.qIndex >= 0 ? ` · Вопрос ${s.qIndex + 1} из ${s.total}` : '');
+
+    document.getElementById('startBtn').disabled = s.phase !== 'lobby';
+    document.getElementById('nextBtn').disabled = s.phase === 'lobby' || s.phase === 'finished';
+
+    const box = document.getElementById('questionBox');
+    if(s.question){
+      box.style.display = 'block';
+      const q = s.question;
+      let html = `<div class="meta">Раунд ${q.round} · ${q.points} очков ${q.manual ? '· нет однозначного ответа, суди по факту' : ''}</div>`;
+      html += `<div class="text">${q.text}</div>`;
+      q.options.forEach((opt, idx) => {
+        const isCorrect = !q.manual && q.correct === idx;
+        html += `<div class="opt-row ${isCorrect ? 'is-correct' : ''}">
+          <strong>${letters[idx]}</strong> ${opt}
+        </div>`;
+      });
+
+      if(q.hint){
+        html += `<div style="margin-top:10px; font-size:12px; opacity:.6;">Подсказка: ${q.hint}</div>`;
+      }
+
+      // Buzz / judge area
+      html += `<div style="margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.1);">`;
+      if(s.buzzedTeam){
+        html += `<div style="font-family:'Bungee',cursive; color:${TEAM_COLOR[s.buzzedTeam]}; font-size:18px; margin-bottom:10px;">
+          🎤 ${s.buzzedName} отвечает — слушаем!
+        </div>`;
+        html += `<button class="btn" style="background:var(--green); color:white;" onclick="judge(true)">✅ Правильно (+${q.points})</button>`;
+        html += `<button class="btn secondary" onclick="judge(false)">❌ Неправильно</button>`;
+      } else if(s.excluded.length > 0){
+        html += `<div style="font-size:13px; opacity:.7;">Ждём, кто нажмёт БАХ (уже мимо: ${s.excluded.map(t => s.teamNames[t]).join(', ')})</div>`;
+      } else {
+        html += `<div style="font-size:13px; opacity:.7;">Ждём, кто первый нажмёт БАХ на телефоне...</div>`;
+      }
+      html += `</div>`;
+
+      box.innerHTML = html;
+    } else {
+      box.style.display = 'none';
+    }
+  }
+
+  document.getElementById('startBtn').addEventListener('click', () => socket.emit('host:start'));
+  document.getElementById('nextBtn').addEventListener('click', () => socket.emit('host:next'));
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if(confirm('Точно сбросить всю игру и очки?')) socket.emit('host:resetGame');
+  });
+
+  function judge(correct){
+    socket.emit('host:judge', { correct });
+  }
+</script>
+
+</body>
+</html>

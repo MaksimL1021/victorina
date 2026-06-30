@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Цирковая викторина — Команда</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Manrope:wght@400;600;800&display=swap');
+
+  :root{
+    --gold: #E8B23B;
+    --cream: #FBF3E2;
+    --navy: #1B1F3B;
+    --green: #1F6F54;
+    --red: #C1272D;
+    --team1: #C1272D;
+    --team2: #1F6F54;
+    --team3: #2B4C8C;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color: transparent; user-select:none;}
+  html, body{ height:100%; overflow:hidden; }
+  body{
+    font-family:'Manrope', sans-serif;
+    background: var(--navy);
+    color: var(--cream);
+  }
+
+  .screen{
+    height:100vh;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    text-align:center;
+  }
+  .screen.active{ display:flex; }
+
+  #setup-screen{
+    background: repeating-linear-gradient(135deg, var(--navy) 0px, var(--navy) 40px, #232852 40px, #232852 80px);
+  }
+
+  h1{
+    font-family:'Bungee', cursive;
+    font-size:clamp(22px, 6vw, 34px);
+    color: var(--gold);
+    text-shadow: 3px 3px 0 var(--red);
+    margin-bottom:8px;
+  }
+
+  p{ opacity:.75; font-size:14px; max-width:320px; margin-bottom:10px; }
+
+  .name-input{
+    width:100%;
+    max-width:340px;
+    padding:12px 16px;
+    margin-bottom:18px;
+    border-radius:12px;
+    border:2px solid rgba(255,255,255,.2);
+    background: rgba(255,255,255,.06);
+    color: var(--cream);
+    font-size:15px;
+    text-align:center;
+  }
+
+  .pick-btn{
+    width:100%;
+    max-width:340px;
+    padding:20px;
+    margin-bottom:12px;
+    border-radius:18px;
+    border:none;
+    font-family:'Bungee', cursive;
+    font-size:18px;
+    color:white;
+    cursor:pointer;
+    box-shadow:0 6px 0 rgba(0,0,0,.3);
+  }
+  .pick-btn:active{ transform:translateY(4px); box-shadow:0 2px 0 rgba(0,0,0,.3); }
+  .pick1{ background: var(--team1); }
+  .pick2{ background: var(--team2); }
+  .pick3{ background: var(--team3); }
+
+  #lobby-screen .pulse{
+    width:18px; height:18px; border-radius:50%;
+    background: var(--gold);
+    margin:18px auto;
+    animation: pulse 1.2s infinite ease-in-out;
+  }
+  @keyframes pulse{
+    0%,100%{ transform:scale(1); opacity:1; }
+    50%{ transform:scale(1.6); opacity:.4; }
+  }
+
+  .roster{
+    display:flex;
+    gap:10px;
+    margin-top:14px;
+  }
+  .roster-dot{
+    padding:8px 14px;
+    border-radius:10px;
+    font-size:13px;
+    font-weight:700;
+    background: rgba(255,255,255,.08);
+    opacity:.4;
+  }
+  .roster-dot.on{ opacity:1; background: rgba(255,255,255,.18); }
+
+  #question-screen{
+    justify-content:flex-start;
+    padding-top:40px;
+  }
+
+  .q-meta{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:2px;
+    color: var(--gold);
+    margin-bottom:10px;
+  }
+
+  .q-text{
+    font-size:clamp(18px, 5vw, 24px);
+    font-weight:800;
+    margin-bottom:26px;
+    line-height:1.3;
+  }
+
+  .options{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .opt-btn{
+    padding:18px;
+    border-radius:14px;
+    border:2px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.05);
+    color: var(--cream);
+    font-size:16px;
+    font-weight:700;
+    text-align:left;
+  }
+  .opt-btn .letter{
+    display:inline-block;
+    width:26px;
+    height:26px;
+    line-height:26px;
+    border-radius:50%;
+    background: var(--gold);
+    color: var(--navy);
+    font-family:'Bungee', cursive;
+    font-size:13px;
+    text-align:center;
+    margin-right:10px;
+  }
+
+  .bah-btn{
+    width:100%;
+    padding:26px;
+    border-radius:18px;
+    border:none;
+    font-family:'Bungee', cursive;
+    font-size:28px;
+    color:white;
+    background: var(--red);
+    cursor:pointer;
+    box-shadow:0 8px 0 rgba(0,0,0,.3);
+    transition: filter .1s ease, transform .06s ease;
+  }
+  .bah-btn:active{ transform: translateY(6px); box-shadow:0 2px 0 rgba(0,0,0,.3); }
+  .bah-btn:disabled{ filter: grayscale(0.6) brightness(.55); cursor:default; }
+  .bah-btn.mine{ background: var(--green); filter: brightness(1.2); }
+
+  .buzz-status{
+    margin-top:14px;
+    font-size:15px;
+    font-weight:700;
+    min-height:20px;
+  }
+
+  #reveal-screen .result-icon{
+    font-size:56px;
+    margin-bottom:10px;
+  }
+  #reveal-screen .result-text{
+    font-family:'Bungee', cursive;
+    font-size:clamp(20px, 6vw, 30px);
+    margin-bottom:10px;
+  }
+  .correct-color{ color: var(--green); }
+  .wrong-color{ color: var(--red); }
+
+  .score-banner{
+    margin-top:24px;
+    background: rgba(0,0,0,.25);
+    border-radius:16px;
+    padding:14px 22px;
+  }
+  .score-banner .label{ font-size:12px; opacity:.7; text-transform:uppercase; letter-spacing:1px; }
+  .score-banner .value{
+    font-family:'Bungee', cursive;
+    font-size:32px;
+    color: var(--gold);
+  }
+
+  #finished-screen .label{ font-size:13px; opacity:.7; }
+  .final-row{
+    display:flex;
+    justify-content:space-between;
+    width:100%;
+    max-width:300px;
+    padding:10px 0;
+    border-bottom:1px solid rgba(255,255,255,.1);
+    font-size:16px;
+  }
+
+  #connStatus{
+    position:fixed; top:8px; right:8px;
+    font-size:11px; padding:4px 8px; border-radius:8px;
+    background:rgba(0,0,0,.3); z-index:20;
+  }
+  #connStatus.offline{ background:var(--red); }
+</style>
+</head>
+<body>
+
+<div id="connStatus">соединение...</div>
+
+<div class="screen active" id="setup-screen">
+  <h1>🎪 ЦИРКОВАЯ ВИКТОРИНА</h1>
+  <p>Выберите свою команду на этом телефоне — один телефон на всю команду.</p>
+  <input class="name-input" id="nameInput" placeholder="Название команды (необязательно)" maxlength="30">
+  <button class="pick-btn pick1" data-team="1">Я — Команда 1</button>
+  <button class="pick-btn pick2" data-team="2">Я — Команда 2</button>
+  <button class="pick-btn pick3" data-team="3">Я — Команда 3</button>
+</div>
+
+<div class="screen" id="lobby-screen">
+  <h1>🎪 ЗАЛ ОЖИДАНИЯ</h1>
+  <div class="pulse"></div>
+  <p>Ждём, пока ведущий начнёт игру...</p>
+  <div class="roster">
+    <div class="roster-dot" id="rosterDot1">Команда 1</div>
+    <div class="roster-dot" id="rosterDot2">Команда 2</div>
+    <div class="roster-dot" id="rosterDot3">Команда 3</div>
+  </div>
+</div>
+
+<div class="screen" id="question-screen">
+  <div class="q-meta" id="qMeta">Раунд 1 · 100 очков</div>
+  <div class="q-text" id="qText">Текст вопроса</div>
+  <div class="options" id="optionsWrap"></div>
+  <div id="buzzArea" style="margin-top:24px; width:100%; max-width:420px;">
+    <button id="bahBtn" class="bah-btn">БАХ!</button>
+    <div id="buzzStatus" class="buzz-status"></div>
+  </div>
+</div>
+
+<div class="screen" id="finished-screen">
+  <h1>🏆 ИГРА ОКОНЧЕНА</h1>
+  <div id="finalScores"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const COLORS = {1:'#C1272D', 2:'#1F6F54', 3:'#2B4C8C'};
+  let myTeam = null;
+  let lastQIndex = -1;
+
+  const screens = {
+    setup: document.getElementById('setup-screen'),
+    lobby: document.getElementById('lobby-screen'),
+    question: document.getElementById('question-screen'),
+    finished: document.getElementById('finished-screen')
+  };
+
+  function showScreen(name){
+    Object.values(screens).forEach(s => s.classList.remove('active'));
+    screens[name].classList.add('active');
+  }
+
+  const connStatus = document.getElementById('connStatus');
+  const socket = io();
+
+  socket.on('connect', () => {
+    connStatus.textContent = 'на связи';
+    connStatus.classList.remove('offline');
+  });
+  socket.on('disconnect', () => {
+    connStatus.textContent = 'нет связи...';
+    connStatus.classList.add('offline');
+  });
+
+  document.querySelectorAll('.pick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const team = Number(btn.dataset.team);
+      const name = document.getElementById('nameInput').value.trim();
+      socket.emit('team:join', { team, name });
+    });
+  });
+
+  socket.on('team:joinError', ({ message }) => {
+    alert(message);
+  });
+
+  socket.on('team:joined', ({ team }) => {
+    myTeam = team;
+  });
+
+  socket.on('state', (s) => {
+    if(!myTeam) return; // still on setup screen
+
+    // update roster dots
+    [1,2,3].forEach(t => {
+      const dot = document.getElementById('rosterDot' + t);
+      dot.classList.toggle('on', !!s.connected[t]);
+      dot.textContent = s.teamNames[t];
+    });
+
+    if(s.phase === 'lobby'){
+      showScreen('lobby');
+      return;
+    }
+
+    if(s.phase === 'finished'){
+      const wrap = document.getElementById('finalScores');
+      wrap.innerHTML = '';
+      const sorted = [1,2,3].sort((a,b) => s.scores[b] - s.scores[a]);
+      sorted.forEach((t, i) => {
+        const row = document.createElement('div');
+        row.className = 'final-row';
+        row.innerHTML = `<span>${i===0 ? '🥇' : i===1 ? '🥈' : '🥉'} ${s.teamNames[t]}</span><span>${s.scores[t]}</span>`;
+        wrap.appendChild(row);
+      });
+      showScreen('finished');
+      return;
+    }
+
+    if(s.qIndex !== lastQIndex){
+      lastQIndex = s.qIndex;
+    }
+
+    if(s.phase === 'question'){
+      renderQuestion(s);
+      showScreen('question');
+    }
+  });
+
+  function renderQuestion(s){
+    document.getElementById('qMeta').textContent = `Раунд ${s.question.round} · ${s.question.points} очков`;
+    document.getElementById('qText').textContent = s.question.text;
+    const wrap = document.getElementById('optionsWrap');
+    wrap.innerHTML = '';
+    const letters = ['A','B','C','D'];
+
+    s.question.options.forEach((opt, idx) => {
+      const div = document.createElement('div');
+      div.className = 'opt-btn';
+      div.innerHTML = `<span class="letter">${letters[idx]}</span>${opt}`;
+      wrap.appendChild(div);
+    });
+
+    const bahBtn = document.getElementById('bahBtn');
+    const statusEl = document.getElementById('buzzStatus');
+    bahBtn.classList.remove('mine');
+
+    const iAmExcluded = s.excluded.includes(myTeam);
+    const someoneElseBuzzed = s.buzzedTeam && s.buzzedTeam !== myTeam;
+    const iBuzzed = s.buzzedTeam === myTeam;
+
+    if(iBuzzed){
+      bahBtn.disabled = true;
+      bahBtn.classList.add('mine');
+      bahBtn.textContent = 'ВЫ ОТВЕЧАЕТЕ!';
+      statusEl.textContent = 'Говорите ответ вслух 🎤';
+    } else if(someoneElseBuzzed){
+      bahBtn.disabled = true;
+      bahBtn.textContent = 'БАХ!';
+      statusEl.textContent = `${s.buzzedName} отвечает первой`;
+    } else if(iAmExcluded){
+      bahBtn.disabled = true;
+      bahBtn.textContent = 'БАХ!';
+      statusEl.textContent = 'Вы уже отвечали неверно на этот вопрос';
+    } else {
+      bahBtn.disabled = false;
+      bahBtn.textContent = 'БАХ!';
+      statusEl.textContent = '';
+    }
+  }
+
+  document.getElementById('bahBtn').addEventListener('click', () => {
+    socket.emit('team:buzz');
+  });
+
+  document.querySelectorAll('.roster-dot').forEach(() => {}); // no-op, keeps structure clear
+</script>
+
+</body>
+</html>
