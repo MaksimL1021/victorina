@@ -97,6 +97,20 @@
     padding:8px 14px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:13px; color:white;
   }
 
+  .score-adjust{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .score-adjust select, .score-adjust input{
+    padding:12px 14px;
+    border-radius:12px;
+    border:none;
+    font-family:'Manrope', sans-serif;
+    font-size:15px;
+    font-weight:600;
+    background: rgba(255,255,255,.1);
+    color: var(--cream);
+  }
+  .score-adjust input{ width:90px; }
+  .score-adjust select option{ color: var(--navy); }
+
   #connStatus{
     position:fixed; top:8px; right:8px;
     font-size:11px; padding:4px 8px; border-radius:8px;
@@ -121,6 +135,16 @@
   <button class="btn danger" id="resetBtn">🔄 Сбросить игру</button>
 
   <div class="question-box" id="questionBox" style="display:none;"></div>
+</div>
+
+<div class="panel">
+  <div style="font-weight:800; margin-bottom:10px;">✏️ Ручное начисление очков</div>
+  <div class="score-adjust">
+    <select id="adjTeam"></select>
+    <input type="number" id="adjAmount" value="10" step="1" inputmode="numeric">
+    <button class="btn" style="background:var(--green); color:white; margin:0;" id="adjAddBtn">➕ Добавить</button>
+    <button class="btn danger" style="margin:0;" id="adjSubBtn">➖ Отнять</button>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -156,6 +180,18 @@
       `;
       teamsRow.appendChild(div);
     });
+
+    // Keep the manual-adjust team dropdown in sync with current team names
+    const adjTeam = document.getElementById('adjTeam');
+    const prevSel = adjTeam.value;
+    adjTeam.innerHTML = '';
+    [1,2,3].forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = `${s.teamNames[t]} (${s.scores[t]})`;
+      adjTeam.appendChild(opt);
+    });
+    if (prevSel) adjTeam.value = prevSel;
 
     const phaseNames = { lobby: 'Зал ожидания', question: 'Идёт вопрос', finished: 'Игра окончена' };
     document.getElementById('phaseLabel').textContent =
@@ -211,6 +247,15 @@
   function judge(correct){
     socket.emit('host:judge', { correct });
   }
+
+  function adjustScore(sign){
+    const team = Number(document.getElementById('adjTeam').value);
+    const amount = Math.abs(parseInt(document.getElementById('adjAmount').value, 10));
+    if(!team || !Number.isFinite(amount) || amount === 0) return;
+    socket.emit('host:adjustScore', { team, delta: sign * amount });
+  }
+  document.getElementById('adjAddBtn').addEventListener('click', () => adjustScore(1));
+  document.getElementById('adjSubBtn').addEventListener('click', () => adjustScore(-1));
 </script>
 
 </body>

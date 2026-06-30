@@ -181,6 +181,16 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
+  // Host manually adjusts a team's score (add or subtract any amount)
+  socket.on('host:adjustScore', ({ team, delta }) => {
+    team = Number(team);
+    delta = Number(delta);
+    if (![1, 2, 3].includes(team)) return;
+    if (!Number.isFinite(delta) || delta === 0) return;
+    state.scores[team] = (state.scores[team] || 0) + delta;
+    broadcast();
+  });
+
   socket.on('host:resetGame', () => {
     // Full reset: clear scores AND free every team slot.
     state = freshState();
