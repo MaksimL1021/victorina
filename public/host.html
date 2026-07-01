@@ -145,12 +145,16 @@
     <button class="btn" style="background:var(--green); color:white; margin:0;" id="adjAddBtn">➕ Добавить</button>
     <button class="btn danger" style="margin:0;" id="adjSubBtn">➖ Отнять</button>
   </div>
+  <div class="score-adjust" style="margin-top:10px;">
+    <button class="btn" style="background:var(--gold); margin:0;" id="adjRoundBtn" disabled>🏆 Начислить очки раунда</button>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
   const TEAM_COLOR = {1:'#C1272D', 2:'#1F6F54', 3:'#2B4C8C'};
   const letters = ['A','B','C','D'];
+  let currentPoints = 0; // points of the current question's round
   const connStatus = document.getElementById('connStatus');
   const socket = io();
 
@@ -192,6 +196,12 @@
       adjTeam.appendChild(opt);
     });
     if (prevSel) adjTeam.value = prevSel;
+
+    // "Начислить очки раунда" button — enabled only during an active question
+    currentPoints = (s.phase === 'question' && s.question) ? s.question.points : 0;
+    const roundBtn = document.getElementById('adjRoundBtn');
+    roundBtn.disabled = !currentPoints;
+    roundBtn.textContent = currentPoints ? `🏆 Начислить очки раунда (+${currentPoints})` : '🏆 Начислить очки раунда';
 
     const phaseNames = { lobby: 'Зал ожидания', question: 'Идёт вопрос', finished: 'Игра окончена' };
     document.getElementById('phaseLabel').textContent =
@@ -256,6 +266,12 @@
   }
   document.getElementById('adjAddBtn').addEventListener('click', () => adjustScore(1));
   document.getElementById('adjSubBtn').addEventListener('click', () => adjustScore(-1));
+
+  document.getElementById('adjRoundBtn').addEventListener('click', () => {
+    const team = Number(document.getElementById('adjTeam').value);
+    if(!team || !currentPoints) return;
+    socket.emit('host:adjustScore', { team, delta: currentPoints });
+  });
 </script>
 
 </body>
